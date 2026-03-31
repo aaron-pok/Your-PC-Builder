@@ -1,1 +1,1 @@
-# Your-PC-Builder
+{ "recommendations": ["expo.vscode-expo-tools"] }

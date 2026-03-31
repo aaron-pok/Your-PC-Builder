@@ -1,0 +1,278 @@
+import AppHeader from "@/components/appheader";
+import { useLocalSearchParams } from "expo-router";
+import React, { useEffect, useState } from "react";
+import {
+  ActivityIndicator,
+  Image,
+  ScrollView,
+  Text,
+  View,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+
+const API_BASE = process.env.EXPO_PUBLIC_API_BASE!;
+type PrebuiltItem = {
+  _id: string;
+  brand_name?: string;
+  series?: string;
+  model?: string;
+  price?: number | null;
+  rating?: number | null;
+  category?: string;
+  type?: string;
+  // Processor
+  processor?: string;
+  processor_brand?: string;
+  core_num?: number | null;
+  threads_num?: number | null;
+  // Memory
+  ram_size?: number | null;
+  ram_type?: string;
+  // Storage
+  storage_size?: number | null;
+  storage_type?: string;
+  // GPU
+  gpu_model?: string;
+  gpu_brand?: string;
+  gpu_type?: string;
+  gpu_memory?: string;
+  // Board & Power
+  motherboard?: string;
+  psu?: string;
+  psu_wattage?: number | null;
+  psu_rating?: string;
+  // Other
+  os?: string;
+  cooling?: string;
+  image_url?: string | null;
+  [key: string]: any;
+};
+
+// Fields handled explicitly — hidden from the "extra" loop at the bottom
+const KNOWN_KEYS = [
+  "_id", "brand_name", "series", "model", "price", "rating",
+  "category", "type",
+  "processor", "processor_brand", "core_num", "threads_num",
+  "ram_size", "ram_type",
+  "storage_size", "storage_type",
+  "gpu_model", "gpu_brand", "gpu_type", "gpu_memory",
+  "motherboard", "psu", "psu_wattage", "psu_rating",
+  "os", "cooling", "image_url",
+];
+
+const formatNrs = (n?: number | null) =>
+  typeof n === "number" ? `NRs ${n.toLocaleString("en-US")}` : "NRs —";
+
+const formatLabel = (key: string) =>
+  key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+
+// ─── Spec Row 
+
+function SpecRow({ label, value }: { label: string; value?: string | null }) {
+  if (!value) return null;
+  return (
+    <View className="flex-row justify-between py-2.5 border-b border-slate-100">
+      <Text className="text-slate-500 text-sm flex-1 mr-4">{label}</Text>
+      <Text className="text-slate-900 text-sm font-semibold flex-1 text-right">
+        {value}
+      </Text>
+    </View>
+  );
+}
+
+// ─── Section Header 
+
+function SectionHeader({ title }: { title: string }) {
+  return (
+    <Text className="text-xs font-bold text-indigo-600 tracking-widest uppercase mt-5 mb-1 ml-0.5">
+      {title}
+    </Text>
+  );
+}
+
+// ─── Main Screen 
+
+export default function PrebuiltDetails() {
+  const { id } = useLocalSearchParams();
+  const [pc, setPc]       = useState<PrebuiltItem | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError]     = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!id) return;
+    (async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const res = await fetch(`${API_BASE}/api/prebuilts/${id}`, {
+          headers: {
+            Accept: "application/json",
+            "ngrok-skip-browser-warning": "true",
+          },
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        setPc(await res.json());
+      } catch (e: any) {
+        setError(e?.message ?? "Failed to load");
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [id]);
+
+  return (
+    <SafeAreaView className="flex-1 bg-white">
+      <AppHeader />
+
+      <ScrollView
+        className="flex-1 px-4"
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 40 }}
+      >
+        {/* ── Loading ── */}
+        {loading && (
+          <View className="py-16 items-center">
+            <ActivityIndicator size="large" color="#4F46E5" />
+            <Text className="text-slate-500 mt-3">Loading details...</Text>
+          </View>
+        )}
+
+        {/* ── Error ── */}
+        {!loading && error && (
+          <View className="bg-red-50 border border-red-200 rounded-2xl p-4 mt-4">
+            <Text className="text-red-600 font-semibold">Failed to load</Text>
+            <Text className="text-red-500 mt-1">{error}</Text>
+          </View>
+        )}
+
+        {/* ── Content ── */}
+        {!loading && !error && pc && (
+          <View className="pb-8">
+
+            {/* Hero image */}
+            <Image
+              source={{
+                uri: pc.image_url?.length
+                  ? pc.image_url
+                  : "https://via.placeholder.com/500",
+              }}
+              className="w-full h-64 rounded-3xl bg-slate-100 mt-3"
+              resizeMode="contain"
+            />
+
+            {/* Title & price */}
+            <Text className="text-2xl font-bold text-slate-900 mt-4" numberOfLines={2}>
+              {pc.model || "Unnamed PC"}
+            </Text>
+
+            {pc.brand_name && (
+              <Text className="text-slate-500 text-sm mt-1">{pc.brand_name}{pc.series ? ` · ${pc.series}` : ""}</Text>
+            )}
+
+            <Text className="text-indigo-600 font-bold text-xl mt-2">
+              {formatNrs(pc.price)}
+            </Text>
+
+            {/* Rating & category badges */}
+            <View className="flex-row gap-x-2 mt-3 flex-wrap">
+              {typeof pc.rating === "number" && (
+                <View className="bg-amber-50 border border-amber-200 px-3 py-1 rounded-full flex-row items-center">
+                  <Text className="text-amber-600 text-xs font-bold">★ {pc.rating.toFixed(1)}</Text>
+                </View>
+              )}
+              {pc.category && (
+                <View className="bg-indigo-50 border border-indigo-200 px-3 py-1 rounded-full">
+                  <Text className="text-indigo-600 text-xs font-bold">{pc.category}</Text>
+                </View>
+              )}
+              {pc.type && (
+                <View className="bg-slate-100 border border-slate-200 px-3 py-1 rounded-full">
+                  <Text className="text-slate-600 text-xs font-semibold">{pc.type}</Text>
+                </View>
+              )}
+            </View>
+
+            {/* ── Processor ── */}
+            <SectionHeader title="Processor" />
+            <View className="bg-slate-50 rounded-2xl px-4 pt-1 pb-2">
+              <SpecRow label="CPU" value={pc.processor} />
+              <SpecRow label="Brand" value={pc.processor_brand} />
+              <SpecRow label="Cores" value={pc.core_num != null ? String(pc.core_num) : null} />
+              <SpecRow label="Threads" value={pc.threads_num != null ? String(pc.threads_num) : null} />
+            </View>
+
+            {/* ── Memory ── */}
+            <SectionHeader title="Memory" />
+            <View className="bg-slate-50 rounded-2xl px-4 pt-1 pb-2">
+              <SpecRow
+                label="RAM"
+                value={pc.ram_size != null ? `${pc.ram_size}GB` : null}
+              />
+              <SpecRow label="RAM Type" value={pc.ram_type} />
+            </View>
+
+            {/* ── Storage ── */}
+            <SectionHeader title="Storage" />
+            <View className="bg-slate-50 rounded-2xl px-4 pt-1 pb-2">
+              <SpecRow
+                label="Capacity"
+                value={pc.storage_size != null ? `${pc.storage_size}GB` : null}
+              />
+              <SpecRow label="Type" value={pc.storage_type} />
+            </View>
+
+            {/* ── Graphics ── */}
+            <SectionHeader title="Graphics" />
+            <View className="bg-slate-50 rounded-2xl px-4 pt-1 pb-2">
+              <SpecRow label="GPU" value={pc.gpu_model} />
+              <SpecRow label="Brand" value={pc.gpu_brand} />
+              <SpecRow label="Type" value={pc.gpu_type} />
+              <SpecRow label="VRAM" value={pc.gpu_memory} />
+            </View>
+
+            {/* ── Motherboard & Power ── */}
+            <SectionHeader title="Motherboard & Power" />
+            <View className="bg-slate-50 rounded-2xl px-4 pt-1 pb-2">
+              <SpecRow label="Motherboard" value={pc.motherboard} />
+              <SpecRow label="PSU" value={pc.psu} />
+              <SpecRow
+                label="PSU Wattage"
+                value={pc.psu_wattage != null ? `${pc.psu_wattage}W` : null}
+              />
+              <SpecRow label="PSU Rating" value={pc.psu_rating} />
+            </View>
+
+            {/* ── System ── */}
+            <SectionHeader title="System" />
+            <View className="bg-slate-50 rounded-2xl px-4 pt-1 pb-2">
+              <SpecRow label="Operating System" value={pc.os} />
+              <SpecRow label="Cooling" value={pc.cooling} />
+            </View>
+
+            {/* ── Any extra fields not in KNOWN_KEYS ── */}
+            {Object.entries(pc).some(
+              ([k, v]) => !KNOWN_KEYS.includes(k) && v !== null && v !== undefined && v !== ""
+            ) && (
+              <>
+                <SectionHeader title="Additional Info" />
+                <View className="bg-slate-50 rounded-2xl px-4 pt-1 pb-2">
+                  {Object.entries(pc).map(([key, value]) => {
+                    if (KNOWN_KEYS.includes(key)) return null;
+                    if (value === null || value === undefined || value === "") return null;
+                    return (
+                      <SpecRow
+                        key={key}
+                        label={formatLabel(key)}
+                        value={String(value)}
+                      />
+                    );
+                  })}
+                </View>
+              </>
+            )}
+          </View>
+        )}
+      </ScrollView>
+    </SafeAreaView>
+  );
+}

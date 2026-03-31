@@ -1,0 +1,331 @@
+import AppHeader from "@/components/appheader";
+import { useLocalSearchParams } from "expo-router";
+import React, { useEffect, useState } from "react";
+import {
+  ActivityIndicator,
+  Image,
+  ScrollView,
+  Text,
+  View,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+
+const API_BASE = process.env.EXPO_PUBLIC_API_BASE!;
+
+type LaptopItem = {
+  _id: string;
+  brand_name?: string;
+  series?: string;
+  model?: string;
+  price?: number | null;
+  rating?: number | null;
+  category?: string;
+  type?: string;
+  // Processor
+  processor?: string;
+  processor_brand?: string;
+  core_num?: number | null;
+  threads_num?: number | null;
+  // Memory
+  ram?: string;
+  ram_size?: number | null;
+  ram_type?: string;
+  // Storage
+  memory_size?: number | null;
+  memory_type?: string;
+  storage_size?: number | null;
+  storage_type?: string;
+  // GPU
+  gpu_model?: string;
+  gpu_brand?: string;
+  gpu_type?: string;
+  gpu_memory?: string;
+  // Display
+  display_size?: string | number | null;
+  display_type?: string;
+  resolution?: string;
+  refresh_rate?: string | number | null;
+  // Battery & Build
+  battery?: string;
+  weight?: string | number | null;
+  // Other
+  os?: string;
+  image_url?: string | null;
+  [key: string]: any;
+};
+
+// Fields handled explicitly — hidden from the "extra" loop
+const KNOWN_KEYS = [
+  "_id", "brand_name", "series", "model", "price", "rating",
+  "category", "type",
+  "processor", "processor_brand", "core_num", "threads_num",
+  "ram", "ram_size", "ram_type",
+  "memory_size", "memory_type", "storage_size", "storage_type",
+  "gpu_model", "gpu_brand", "gpu_type", "gpu_memory",
+  "display_size", "display_type", "resolution", "refresh_rate",
+  "battery", "weight",
+  "os", "image_url",
+];
+
+const formatNrs = (n?: number | null) =>
+  typeof n === "number" ? `NRs ${n.toLocaleString("en-US")}` : "NRs —";
+
+const formatLabel = (key: string) =>
+  key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+
+//Spec Row
+
+function SpecRow({ label, value }: { label: string; value?: string | null }) {
+  if (!value) return null;
+  return (
+    <View className="flex-row justify-between py-2.5 border-b border-slate-100">
+      <Text className="text-slate-500 text-sm flex-1 mr-4">{label}</Text>
+      <Text className="text-slate-900 text-sm font-semibold flex-1 text-right">
+        {value}
+      </Text>
+    </View>
+  );
+}
+
+//Section Header
+
+function SectionHeader({ title }: { title: string }) {
+  return (
+    <Text className="text-xs font-bold text-indigo-600 tracking-widest uppercase mt-5 mb-1 ml-0.5">
+      {title}
+    </Text>
+  );
+}
+
+//Main Screen 
+
+export default function LaptopDetails() {
+  const { id } = useLocalSearchParams();
+  const [laptop, setLaptop] = useState<LaptopItem | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError]     = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!id) return;
+    (async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const res = await fetch(`${API_BASE}/api/laptops/${id}`, {
+          headers: {
+            Accept: "application/json",
+            "ngrok-skip-browser-warning": "true",
+          },
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        setLaptop(await res.json());
+      } catch (e: any) {
+        setError(e?.message ?? "Failed to load laptop");
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [id]);
+
+  // Helper: resolve RAM string from various field combos
+  const ramText = laptop
+    ? laptop.ram_size
+      ? `${laptop.ram_size}GB${laptop.ram_type ? ` ${laptop.ram_type}` : ""}`
+      : laptop.ram ?? null
+    : null;
+
+  // Helper: resolve storage string
+  const storageText = laptop
+    ? laptop.storage_size
+      ? `${laptop.storage_size}GB${laptop.storage_type ? ` ${laptop.storage_type}` : ""}`
+      : laptop.memory_size
+      ? `${laptop.memory_size}GB${laptop.memory_type ? ` ${laptop.memory_type}` : ""}`
+      : null
+    : null;
+
+  return (
+    <SafeAreaView className="flex-1 bg-white">
+      <AppHeader />
+
+      <ScrollView
+        className="flex-1 px-4"
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 40 }}
+      >
+        {/* ── Loading ── */}
+        {loading && (
+          <View className="py-16 items-center">
+            <ActivityIndicator size="large" color="#4F46E5" />
+            <Text className="text-slate-500 mt-3">Loading details...</Text>
+          </View>
+        )}
+
+        {/* ── Error ── */}
+        {!loading && error && (
+          <View className="bg-red-50 border border-red-200 rounded-2xl p-4 mt-4">
+            <Text className="text-red-600 font-semibold">Failed to load</Text>
+            <Text className="text-red-500 mt-1">{error}</Text>
+          </View>
+        )}
+
+        {/* ── Content ── */}
+        {!loading && !error && laptop && (
+          <View className="pb-8">
+
+            {/* Hero image */}
+            <Image
+              source={{
+                uri: laptop.image_url?.length
+                  ? laptop.image_url
+                  : "https://via.placeholder.com/500",
+              }}
+              className="w-full h-64 rounded-3xl bg-slate-100 mt-3"
+              resizeMode="contain"
+            />
+
+            {/* Title */}
+            <Text className="text-2xl font-bold text-slate-900 mt-4" numberOfLines={2}>
+              {laptop.model || "Unnamed Laptop"}
+            </Text>
+
+            {/* Brand & series */}
+            {laptop.brand_name && (
+              <Text className="text-slate-500 text-sm mt-1">
+                {laptop.brand_name}
+                {laptop.series ? ` · ${laptop.series}` : ""}
+              </Text>
+            )}
+
+            {/* Price */}
+            <Text className="text-indigo-600 font-bold text-xl mt-2">
+              {formatNrs(laptop.price)}
+            </Text>
+
+            {/* Badges */}
+            <View className="flex-row gap-x-2 mt-3 flex-wrap">
+              {typeof laptop.rating === "number" && (
+                <View className="bg-amber-50 border border-amber-200 px-3 py-1 rounded-full">
+                  <Text className="text-amber-600 text-xs font-bold">
+                    ★ {laptop.rating.toFixed(1)}
+                  </Text>
+                </View>
+              )}
+              {laptop.category && (
+                <View className="bg-indigo-50 border border-indigo-200 px-3 py-1 rounded-full">
+                  <Text className="text-indigo-600 text-xs font-bold">{laptop.category}</Text>
+                </View>
+              )}
+              {laptop.type && (
+                <View className="bg-slate-100 border border-slate-200 px-3 py-1 rounded-full">
+                  <Text className="text-slate-600 text-xs font-semibold">{laptop.type}</Text>
+                </View>
+              )}
+            </View>
+
+            {/* ── Processor ── */}
+            <SectionHeader title="Processor" />
+            <View className="bg-slate-50 rounded-2xl px-4 pt-1 pb-2">
+              <SpecRow label="CPU" value={laptop.processor} />
+              <SpecRow label="Brand" value={laptop.processor_brand} />
+              <SpecRow
+                label="Cores"
+                value={laptop.core_num != null ? String(laptop.core_num) : null}
+              />
+              <SpecRow
+                label="Threads"
+                value={laptop.threads_num != null ? String(laptop.threads_num) : null}
+              />
+            </View>
+
+            {/* ── Memory ── */}
+            <SectionHeader title="Memory" />
+            <View className="bg-slate-50 rounded-2xl px-4 pt-1 pb-2">
+              <SpecRow label="RAM" value={ramText} />
+              <SpecRow label="RAM Type" value={laptop.ram_type} />
+            </View>
+
+            {/* ── Storage ── */}
+            <SectionHeader title="Storage" />
+            <View className="bg-slate-50 rounded-2xl px-4 pt-1 pb-2">
+              <SpecRow label="Storage" value={storageText} />
+              <SpecRow label="Type" value={laptop.storage_type ?? laptop.memory_type} />
+            </View>
+
+            {/* ── Graphics ── */}
+            <SectionHeader title="Graphics" />
+            <View className="bg-slate-50 rounded-2xl px-4 pt-1 pb-2">
+              <SpecRow label="GPU" value={laptop.gpu_model} />
+              <SpecRow
+                label="GPU"
+                value={
+                  !laptop.gpu_model
+                    ? [laptop.gpu_brand, laptop.gpu_type].filter(Boolean).join(" ") || null
+                    : null
+                }
+              />
+              <SpecRow label="Brand" value={laptop.gpu_brand} />
+              <SpecRow label="Type" value={laptop.gpu_type} />
+              <SpecRow label="VRAM" value={laptop.gpu_memory} />
+            </View>
+
+            {/* ── Display ── */}
+            {(laptop.display_size || laptop.display_type || laptop.resolution || laptop.refresh_rate) && (
+              <>
+                <SectionHeader title="Display" />
+                <View className="bg-slate-50 rounded-2xl px-4 pt-1 pb-2">
+                  <SpecRow
+                    label="Size"
+                    value={laptop.display_size != null ? String(laptop.display_size) : null}
+                  />
+                  <SpecRow label="Type" value={laptop.display_type} />
+                  <SpecRow label="Resolution" value={laptop.resolution} />
+                  <SpecRow
+                    label="Refresh Rate"
+                    value={laptop.refresh_rate != null ? `${laptop.refresh_rate}Hz` : null}
+                  />
+                </View>
+              </>
+            )}
+
+            {/* ── System ── */}
+            <SectionHeader title="System" />
+            <View className="bg-slate-50 rounded-2xl px-4 pt-1 pb-2">
+              <SpecRow label="Operating System" value={laptop.os} />
+              <SpecRow
+                label="Weight"
+                value={laptop.weight != null ? String(laptop.weight) : null}
+              />
+              <SpecRow label="Battery" value={laptop.battery} />
+            </View>
+
+            {/* ── Additional / extra fields ── */}
+            {Object.entries(laptop).some(
+              ([k, v]) =>
+                !KNOWN_KEYS.includes(k) &&
+                v !== null &&
+                v !== undefined &&
+                v !== ""
+            ) && (
+              <>
+                <SectionHeader title="Additional Info" />
+                <View className="bg-slate-50 rounded-2xl px-4 pt-1 pb-2">
+                  {Object.entries(laptop).map(([key, value]) => {
+                    if (KNOWN_KEYS.includes(key)) return null;
+                    if (value === null || value === undefined || value === "") return null;
+                    return (
+                      <SpecRow
+                        key={key}
+                        label={formatLabel(key)}
+                        value={String(value)}
+                      />
+                    );
+                  })}
+                </View>
+              </>
+            )}
+          </View>
+        )}
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
